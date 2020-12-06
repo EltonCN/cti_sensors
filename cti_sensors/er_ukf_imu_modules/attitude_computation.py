@@ -18,14 +18,14 @@ class AttitudeComputation():
 
         wb = np.eye(3, dtype=np.float32)
 
-        wb[0][1] = sin(self.computedTheta[0])*tan(self.computedTheta[1])
-        wb[0][2] = cos(self.computedTheta[0])*tan(self.computedTheta[1])
+        wb[0][1] = sin(self.correctedTheta[0])*tan(self.correctedTheta[1])
+        wb[0][2] = cos(self.correctedTheta[0])*tan(self.correctedTheta[1])
         
-        wb[1][1] = cos(self.computedTheta[0])
-        wb[1][2] = -sin(self.computedTheta[0])
+        wb[1][1] = cos(self.correctedTheta[0])
+        wb[1][2] = -sin(self.correctedTheta[0])
 
-        wb[2][1] = sin(self.computedTheta[0])/cos(self.computedTheta[1])
-        wb[2][2] = cos(self.computedTheta[0])/cos(self.computedTheta[1])
+        wb[2][1] = sin(self.correctedTheta[0])/cos(self.correctedTheta[1])
+        wb[2][2] = cos(self.correctedTheta[0])/cos(self.correctedTheta[1])
 
         return wb
 
@@ -40,11 +40,12 @@ class AttitudeComputation():
     def correctTheta(self):
         '''!
             Calcula o vetor Theta corrigido
-
-            @todo Verificar se se deve somar ou subtrair o estimateThetaError
         '''
 
         self.correctedTheta = self.computedTheta + self.estimateThetaError
+
+
+        self.estimateThetaError = np.array([0,0,0], dtype=np.float32)
 
     def computeAll(self, deltaT):
         self.computeTheta(deltaT)
@@ -63,6 +64,11 @@ class AttitudeComputation():
         self.calculated = False
     
     def getTheta(self):
+        for i in range(3):
+            if self.correctedTheta[i] > np.pi:
+                self.correctedTheta[i] = np.pi-0.1
+            elif self.correctedTheta[i] < -np.pi:
+                self.correctedTheta[i] = -np.pi+0.1
 
         return self.correctedTheta
 

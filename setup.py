@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'er_ukf_imu = cti_sensors.er_ukf_imu:main'
+            'er_ukf_imu = cti_sensors.er_ukf_imu:main',
+            'dataset_test= cti_sensors.dataset_test:main',
         ],
     },
 )

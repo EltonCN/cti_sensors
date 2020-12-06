@@ -12,8 +12,8 @@ class MeasurementHandler():
 
         self.calculated = True
 
-        self.magneticIntensity = magneticIntensity
-        self.inclination = np.radians(inclination)
+        self.magneticIntensity = 48956.6e-9#magneticIntensity
+        self.inclination = np.radians(66.6442)#inclination)
         self.gravity = gravity
 
     def setMagneticIntensity(self, magneticIntensity):
@@ -45,12 +45,17 @@ class MeasurementHandler():
         #phi = 0, theta = 1, psi = 2
         phi = arctan2(self.accel[1], self.accel[2])
 
+        if self.accel[0] >= self.gravity:
+            self.accel[0] = self.gravity - 0.1
+        elif self.accel[0] <= -self.gravity:
+            self.accel[0] = -self.gravity + 0.1
+
         thetaArc = -self.accel[0]/self.gravity
 
-        if(thetaArc < -1):
-            thetaArc = -1
-        elif(thetaArc> 1):
-            thetaArc = 1
+        if(thetaArc <= -1):
+            thetaArc = -0.9
+        elif(thetaArc >= 1):
+            thetaArc = 0.9
 
         theta = arcsin(thetaArc)
 
@@ -63,10 +68,24 @@ class MeasurementHandler():
         self.referenceOrientation[1] = theta
         self.referenceOrientation[2] = psi
 
+        for i in range(3):
+            if self.referenceOrientation[i] > np.pi:
+                self.referenceOrientation[i] = np.pi-0.1
+            elif self.referenceOrientation[i] < -np.pi:
+                self.referenceOrientation[i] = -np.pi+0.1
+
+
+
     def compute(self):
         self.computeReference()
 
         self.measurement = self.referenceOrientation - self.correctedTheta
+
+        for i in range(3):
+            if self.measurement[i] > np.pi:
+                self.measurement[i] = np.pi-0.1
+            elif self.measurement[i] < -np.pi:
+                self.measurement[i] = -np.pi+0.1
 
         self.calculated = True
 

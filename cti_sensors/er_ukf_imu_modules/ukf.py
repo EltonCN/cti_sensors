@@ -19,8 +19,8 @@ class UKF():
         self.estimateState = np.zeros(6, dtype=np.float32)
         self.stateCovariance = np.eye(6,dtype=np.float32) *1
 
-        self.processNoise = np.eye(6,dtype=np.float32)*(72e-3)
-        self.measurementNoise = np.eye(3,dtype=np.float32)*(0.0005)
+        self.processNoise = np.eye(6,dtype=np.float32)*(72e-3) #Q
+        self.measurementNoise = np.eye(3,dtype=np.float32)*(72e-3) #R
 
         self.N = 6.0
         self.k = 3.0-self.N
@@ -36,14 +36,14 @@ class UKF():
 
         wb = np.eye(3, dtype=np.float32)
 
-        wb[0][1] = sin(x[3])*tan(x[4])
-        wb[0][2] = cos(x[3])*tan(x[4])
+        wb[0][1] = sin(x[0])*tan(x[1])
+        wb[0][2] = cos(x[0])*tan(x[1])
         
-        wb[1][1] = cos(x[3])
-        wb[1][2] = -sin(x[3])
+        wb[1][1] = cos(x[0])
+        wb[1][2] = -sin(x[0])
 
-        wb[2][1] = sin(x[3])/cos(x[4])
-        wb[2][2] = cos(x[3])/cos(x[4])
+        wb[2][1] = sin(x[0])/cos(x[1])
+        wb[2][2] = cos(x[0])/cos(x[1])
 
         return wb
 
@@ -71,6 +71,7 @@ class UKF():
     def f(self, x, w2, deltaT):
         wB = self.computeWb(x)
         vB = self.computeVb(x)
+
 
         theta = x[0:3]
         w = x[3:6]
@@ -103,6 +104,7 @@ class UKF():
         return self.estimateState[:3]
 
     def computeSigmaPoint(self, state, covariance):
+
         L = np.linalg.cholesky(covariance)
 
         sigmaPoint = np.zeros((13,6), dtype=np.float32)
@@ -198,14 +200,14 @@ class UKF():
             b.shape = (3,1)
 
             crossCovariance += alpha*(a@b.T)
-
+        
         kalmanGain = crossCovariance @ np.linalg.inv(predictedMeasureCov)
 
         #Corrigir media e covariancia
         self.estimateState = predictedState + (kalmanGain@(self.measurement-predictedMeasure))
 
         self.stateCovariance = predictedCovariance - ((kalmanGain@predictedMeasureCov)@kalmanGain.T)
-    
+
     def computeAlpha(self, i):
         if(i == 0):
             return self.k/(self.N+self.k)

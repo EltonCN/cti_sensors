@@ -36,6 +36,7 @@ class UkfImuNode(Node):
         timer_period = 0.05
         self.kalmanTimer = self.create_timer(timer_period, self.kalmanCallback)
 
+        timer_period = 0.025
         self.orientationTimer = self.create_timer(timer_period, self.orientationCallback)
 
         self.kalmanTime = self.get_clock().now()
@@ -85,12 +86,16 @@ class UkfImuNode(Node):
         deltaT = self.get_clock().now() - self.kalmanTime
         deltaT = float(deltaT.nanoseconds) * (10**-9)
 
-        self.ukf.compute(deltaT)
+        try:
+            self.ukf.compute(deltaT)
 
-        self.attitudeComputation.setThetaError(self.ukf.getThetaError())
-        self.gyroErrorCompensation.setPredictedOmegaError(self.ukf.getOmegaError())
+            self.attitudeComputation.setThetaError(self.ukf.getThetaError())
+            self.gyroErrorCompensation.setPredictedOmegaError(self.ukf.getOmegaError())
 
-        self.kalmanTime = self.get_clock().now()
+            self.kalmanTime = self.get_clock().now()
+        except:
+            self._logger.error("Filtro gerou excecao. Reiniciando filtro")
+            self.ukf = UKF()
 
     def orientationCallback(self):
         deltaT = self.get_clock().now() - self.orientationTime
@@ -107,11 +112,11 @@ class UkfImuNode(Node):
 
         degree = np.degrees(theta)
 
-        self.publishDebug(np.degrees(self.ukf.getThetaError()))
+        self.publishDebug(np.degrees(self.measurementHandler.referenceOrientation))
         self.publishDebug(degree,2)
 
-        self.publish(degree, omega)
-
+        self.publish(theta, omega)
+        #self.publish(self.measurementHandler.referenceOrientation,omega)
 
         self.orientationTime =self.get_clock().now()
     
