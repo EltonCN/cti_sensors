@@ -3,10 +3,10 @@ from numpy import sin, cos, tan
 
 class AttitudeComputation():
     def __init__(self):
-        self.computedTheta = np.array([0,0,0], dtype=np.float32)
-        self.correctedTheta = np.array([0,0,0], dtype=np.float32)
-        self.correctedOmega = np.array([0,0,0], dtype=np.float32)
-        self.estimateThetaError = np.array([0,0,0], dtype=np.float32)
+        self.computedTheta = np.array([0,0,0], dtype=np.float64)
+        self.correctedTheta = np.array([0,0,0], dtype=np.float64)
+        self.correctedOmega = np.array([0,0,0], dtype=np.float64)
+        self.estimateThetaError = np.array([0,0,0], dtype=np.float64)
         
 
         self.calculated = True
@@ -16,7 +16,7 @@ class AttitudeComputation():
             Calcula a matriz Wb descrita na equação (6) de [3], que possibilita computar dtheta_dt
         '''
 
-        wb = np.eye(3, dtype=np.float32)
+        wb = np.eye(3, dtype=np.float64)
 
         wb[0][1] = sin(self.correctedTheta[0])*tan(self.correctedTheta[1])
         wb[0][2] = cos(self.correctedTheta[0])*tan(self.correctedTheta[1])
@@ -38,7 +38,7 @@ class AttitudeComputation():
         wY = self.correctedOmega[1]
         wZ = self.correctedOmega[2]
 
-        vB = np.zeros((3,3), dtype=np.float32)
+        vB = np.zeros((3,3), dtype=np.float64)
 
         vB[0][0] = ((cos(psi)*sin(theta)*wY)/cos(theta)) - ((sin(psi)*sin(theta)*wZ)/cos(theta))
         vB[0][1] = ((sin(psi)*wY)/np.power(cos(theta), 2)) + ((cos(psi)*wZ)/np.power(cos(theta), 2))
@@ -70,7 +70,7 @@ class AttitudeComputation():
         self.correctedTheta = self.computedTheta + self.estimateThetaError
 
 
-        self.estimateThetaError = np.array([0,0,0], dtype=np.float32)
+        self.estimateThetaError = np.array([0,0,0], dtype=np.float64)
 
     def computeAll(self, deltaT):
         self.computeTheta(deltaT)

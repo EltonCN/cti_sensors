@@ -39,13 +39,13 @@ class DatasetTest(Node):
         self.index = 0
 
     def estimationCallback(self, msg):
-        truthOrientation = np.zeros(4, dtype=np.float32)
+        truthOrientation = np.zeros(4, dtype=np.float64)
         truthOrientation[0] = self.truthFrame["rotation.x"][self.index]
         truthOrientation[1] = self.truthFrame["rotation.y"][self.index]
         truthOrientation[2] = self.truthFrame["rotation.z"][self.index]
         truthOrientation[3] = self.truthFrame["rotation.w"][self.index]
 
-        estimateOrientation = np.zeros(4, dtype=np.float32)
+        estimateOrientation = np.zeros(4, dtype=np.float64)
         estimateOrientation[0] = msg.orientation.x
         estimateOrientation[1] = msg.orientation.y
         estimateOrientation[2] = msg.orientation.z

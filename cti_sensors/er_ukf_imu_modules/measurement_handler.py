@@ -3,12 +3,12 @@ from numpy import arctan2, arcsin, cos, sin
 
 class MeasurementHandler():
     def __init__(self, magneticIntensity=22902.5e-9, inclination=-39.2538, gravity=9.78613):
-        self.referenceOrientation = np.array([0,0,0], dtype=np.float32)
-        self.measurement = np.array([0,0,0], dtype=np.float32)
-        self.accel = np.array([0,0,0], dtype=np.float32)
-        self.mag = np.array([0,0,0], dtype=np.float32)
+        self.referenceOrientation = np.array([0,0,0], dtype=np.float64)
+        self.measurement = np.array([0,0,0], dtype=np.float64)
+        self.accel = np.array([0,0,0], dtype=np.float64)
+        self.mag = np.array([0,0,0], dtype=np.float64)
 
-        self.correctedTheta = np.array([0,0,0], dtype=np.float32)
+        self.correctedTheta = np.array([0,0,0], dtype=np.float64)
 
         self.calculated = True
 

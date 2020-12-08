@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation
 
 from sensor_msgs.msg import Imu, MagneticField
 from std_msgs.msg import Header
-from geometry_msgs.msg import Vector3, PoseStamped
+from geometry_msgs.msg import Vector3, PoseStamped, Quaternion
 
 from .er_ukf_imu_modules.attitude_computation import AttitudeComputation
 from .er_ukf_imu_modules.error_compensation import GyroErrorCompensation
@@ -20,19 +20,18 @@ class UkfImuNode(Node):
         self.imuSub = self.create_subscription(Imu, 'imu', self.imuCallback, 10)
         self.magSub = self.create_subscription(MagneticField, 'mag', self.magCallback, 10)
         self.publisher = self.create_publisher(Imu, "ukf_estimation", 10)
-        self.tfPublisher = self.create_publisher(PoseStamped, 'ukf_tf_transform', 10)
-        self.debugPublisher = self.create_publisher(Vector3,"ukf_debug",10)
-        self.debugPublisher2 = self.create_publisher(Vector3,"ukf_debug2",10)
 
-        self.accel = np.array([0.0,0.0,0.0], dtype=np.float32)
+        self.accel = np.array([0.0,0.0,0.0], dtype=np.float64)
         self.gravity = gravity
         self.header = Header()
 
         self.attitudeComputation = AttitudeComputation()
         self.gyroErrorCompensation = GyroErrorCompensation()
         self.measurementHandler = MeasurementHandler()
-
         self.ukf = UKF()
+
+        self.kalmanTime = np.ones(2,dtype=np.float64)*-1
+        self.orientationTime = np.ones(2,dtype=np.float64)*-1
 
         timer_period = 0.016
         self.kalmanTimer = self.create_timer(timer_period, self.kalmanCallback)
@@ -40,8 +39,14 @@ class UkfImuNode(Node):
         timer_period = 0.016
         self.orientationTimer = self.create_timer(timer_period, self.orientationCallback)
 
-        self.kalmanTime = self.get_clock().now()
-        self.orientationTime =self.get_clock().now()
+        self.debugTimer = self.create_timer(timer_period, self.debugCallback)
+
+        self.debugPublisher = []
+        self.debugPublisher.append(self.create_publisher(PoseStamped, '~/estimate_pose', 10))
+        self.debugPublisher.append(self.create_publisher(PoseStamped, '~/reference_pose', 10))
+        self.debugPublisher.append(self.create_publisher(PoseStamped, '~/without_correction', 10))
+        self.debugPublisher.append(self.create_publisher(Vector3, '~/estimate', 10))
+        self.debugPublisher.append(self.create_publisher(Vector3, '~/reference', 10))
 
     def publishDebug(self, vec, channel=1):
         msg = Vector3()
@@ -61,7 +66,7 @@ class UkfImuNode(Node):
 
         self.header = msg.header
 
-        gyro = np.zeros(3,dtype=np.float32)
+        gyro = np.zeros(3,dtype=np.float64)
         gyro[0] = msg.angular_velocity.x
         gyro[1] = msg.angular_velocity.y
         gyro[2] = msg.angular_velocity.z
@@ -69,9 +74,19 @@ class UkfImuNode(Node):
         self.gyroErrorCompensation.setMeasuredOmega(gyro)
         self.measurementHandler.setAccelRead(self.accel)
 
+
+        time = float(msg.header.stamp.sec)+(float(msg.header.stamp.nanosec)*(10**-9))
+
+        self.orientationTime[0] = time
+
+        self.kalmanTime[0] = time
+
+        if self.orientationTime[1] == -1:
+            self.orientationTime[1] = time
+            self.kalmanTime[1] = time
     
     def magCallback(self, msg):
-        mag = np.zeros(3,dtype=np.float32)
+        mag = np.zeros(3,dtype=np.float64)
         mag[0] = msg.magnetic_field.x
         mag[1] = msg.magnetic_field.y
         mag[2] = msg.magnetic_field.z
@@ -79,13 +94,15 @@ class UkfImuNode(Node):
         self.measurementHandler.setMagRead(mag)
 
     def kalmanCallback(self):
+        
+        if self.kalmanTime[0] == -1:
+            return
 
         self.ukf.setMeasurement(self.measurementHandler.getMeasurement())
         self.ukf.setEstimateOmega(self.gyroErrorCompensation.getCorrectedOmega())
         self.ukf.setEstimateTheta(self.attitudeComputation.getTheta())
 
-        deltaT = self.get_clock().now() - self.kalmanTime
-        deltaT = float(deltaT.nanoseconds) * (10**-9)
+        deltaT = self.kalmanTime[0] - self.kalmanTime[1]
         
         try:
             self.ukf.compute(deltaT)
@@ -93,14 +110,19 @@ class UkfImuNode(Node):
             self.attitudeComputation.setThetaError(self.ukf.getThetaError())
             self.gyroErrorCompensation.setPredictedOmegaError(self.ukf.getOmegaError())
 
-            self.kalmanTime = self.get_clock().now()
+            self.kalmanTime[1] = self.kalmanTime[0]
+            self.kalmanTime[0] = -1
+        
         except Exception as e:
             self._logger.error("Filtro gerou excecao: "+str(e)+". Reiniciando filtro")
             self.ukf = UKF()
 
     def orientationCallback(self):
-        deltaT = self.get_clock().now() - self.orientationTime
-        deltaT = float(deltaT.nanoseconds) * (10**-9)
+
+        if self.orientationTime[0] == -1:
+            return
+
+        deltaT = self.orientationTime[0] - self.orientationTime[1]
 
         omega = self.gyroErrorCompensation.getCorrectedOmega()
 
@@ -111,24 +133,17 @@ class UkfImuNode(Node):
 
         self.measurementHandler.setTheta(theta)
 
-        degree = np.degrees(theta)
-
-        self.publishDebug(np.degrees(self.measurementHandler.referenceOrientation))
-        self.publishDebug(degree,2)
 
         self.publish(theta, omega)
-        #self.publish(self.measurementHandler.referenceOrientation,omega)
-
-        self.orientationTime =self.get_clock().now()
+       
+        self.orientationTime[1] = self.orientationTime[0]
+        self.orientationTime[0] = -1
     
     def publish(self, theta, omega):
         
         msg = Imu()
 
-        header = self.header
-        timeStamp = self.get_clock().now().to_msg()
-        header.stamp = timeStamp
-        msg.header = header
+        msg.header = self.header
 
         msg.angular_velocity.x = omega[0]*1
         msg.angular_velocity.y = omega[1]*1
@@ -137,7 +152,7 @@ class UkfImuNode(Node):
         gravityRotated = np.array([-self.gravity*np.sin(theta[1]), 
                                     self.gravity*np.cos(theta[1])*np.sin(theta[0]),
                                     self.gravity*np.cos(theta[1])*np.sin(theta[0]) ],
-                                    dtype=np.float32)
+                                    dtype=np.float64)
         pureAcceleration = self.accel - gravityRotated
         msg.linear_acceleration.x = pureAcceleration[0]*1
         msg.linear_acceleration.y = pureAcceleration[1]*1
@@ -148,25 +163,66 @@ class UkfImuNode(Node):
         msg.orientation_covariance = cov
         msg.linear_acceleration_covariance = cov
 
-        r = Rotation.from_euler('xyz',theta)
-        quat = r.as_quat()
-        msg.orientation.x = quat[0]*1
-        msg.orientation.y = quat[1]*1
-        msg.orientation.z = quat[2]*1
-        msg.orientation.w = quat[3]*1
+        msg.orientation = self.thetaToOrientation(theta)
 
         self.publisher.publish(msg)
 
-        msg2 = PoseStamped()
+    def thetaToOrientation(self, theta):
+        r = Rotation.from_euler('xyz',theta)
+        quat = r.as_quat()
 
-        msg2.header = header
-        msg2.pose.orientation = msg.orientation
-        msg2.pose.position.x = 0.0
-        msg2.pose.position.y = 0.0
-        msg2.pose.position.z = 0.0
+        orientation = Quaternion()
 
-        self.tfPublisher.publish(msg2)
+        orientation.x = quat[0]*1
+        orientation.y = quat[1]*1
+        orientation.z = quat[2]*1
+        orientation.w = quat[3]*1
 
+        return orientation
+
+    def debugCallback(self):
+        msg = PoseStamped()
+        msg.header = self.header
+        msg.pose.orientation = self.thetaToOrientation(self.attitudeComputation.getTheta())
+        msg.pose.position.x = 0.0
+        msg.pose.position.y = 0.0
+        msg.pose.position.z = 0.0
+
+        self.debugPublisher[0].publish(msg)
+
+        msg = PoseStamped()
+        msg.header = self.header
+        msg.pose.orientation = self.thetaToOrientation(self.measurementHandler.referenceOrientation)
+        msg.pose.position.x = 0.0
+        msg.pose.position.y = 0.0
+        msg.pose.position.z = 0.0
+
+        self.debugPublisher[1].publish(msg)
+
+        msg = PoseStamped()
+        msg.header = self.header
+        msg.pose.orientation = self.thetaToOrientation(self.attitudeComputation.computedTheta)
+        msg.pose.position.x = 0.0
+        msg.pose.position.y = 0.0
+        msg.pose.position.z = 0.0
+
+        self.debugPublisher[2].publish(msg)
+
+        msg = Vector3()
+        degree = np.degrees(self.attitudeComputation.getTheta())
+        msg.x = degree[0]
+        msg.x = degree[1]
+        msg.x = degree[2]
+
+        self.debugPublisher[3].publish(msg)
+
+        msg = Vector3()
+        degree = np.degrees(self.measurementHandler.referenceOrientation)
+        msg.x = degree[0]
+        msg.x = degree[1]
+        msg.x = degree[2]
+
+        self.debugPublisher[3].publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
