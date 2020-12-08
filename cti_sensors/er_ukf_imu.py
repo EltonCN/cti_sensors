@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation
 
 from sensor_msgs.msg import Imu, MagneticField
 from std_msgs.msg import Header
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3, PoseStamped
 
 from .er_ukf_imu_modules.attitude_computation import AttitudeComputation
 from .er_ukf_imu_modules.error_compensation import GyroErrorCompensation
@@ -20,6 +20,7 @@ class UkfImuNode(Node):
         self.imuSub = self.create_subscription(Imu, 'imu', self.imuCallback, 10)
         self.magSub = self.create_subscription(MagneticField, 'mag', self.magCallback, 10)
         self.publisher = self.create_publisher(Imu, "ukf_estimation", 10)
+        self.tfPublisher = self.create_publisher(PoseStamped, 'ukf_tf_transform', 10)
         self.debugPublisher = self.create_publisher(Vector3,"ukf_debug",10)
         self.debugPublisher2 = self.create_publisher(Vector3,"ukf_debug2",10)
 
@@ -33,10 +34,10 @@ class UkfImuNode(Node):
 
         self.ukf = UKF()
 
-        timer_period = 0.05
+        timer_period = 0.016
         self.kalmanTimer = self.create_timer(timer_period, self.kalmanCallback)
 
-        timer_period = 0.025
+        timer_period = 0.016
         self.orientationTimer = self.create_timer(timer_period, self.orientationCallback)
 
         self.kalmanTime = self.get_clock().now()
@@ -85,7 +86,7 @@ class UkfImuNode(Node):
 
         deltaT = self.get_clock().now() - self.kalmanTime
         deltaT = float(deltaT.nanoseconds) * (10**-9)
-
+        
         try:
             self.ukf.compute(deltaT)
 
@@ -93,8 +94,8 @@ class UkfImuNode(Node):
             self.gyroErrorCompensation.setPredictedOmegaError(self.ukf.getOmegaError())
 
             self.kalmanTime = self.get_clock().now()
-        except:
-            self._logger.error("Filtro gerou excecao. Reiniciando filtro")
+        except Exception as e:
+            self._logger.error("Filtro gerou excecao: "+str(e)+". Reiniciando filtro")
             self.ukf = UKF()
 
     def orientationCallback(self):
@@ -155,6 +156,17 @@ class UkfImuNode(Node):
         msg.orientation.w = quat[3]*1
 
         self.publisher.publish(msg)
+
+        msg2 = PoseStamped()
+
+        msg2.header = header
+        msg2.pose.orientation = msg.orientation
+        msg2.pose.position.x = 0.0
+        msg2.pose.position.y = 0.0
+        msg2.pose.position.z = 0.0
+
+        self.tfPublisher.publish(msg2)
+
 
 def main(args=None):
     rclpy.init(args=args)

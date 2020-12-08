@@ -29,13 +29,38 @@ class AttitudeComputation():
 
         return wb
 
+    def computevB(self):
+        #equacao 11, Intertial Head-Tracker Sensor Fusion by a Complementary Separate-Bias Kalman Filter 
+        psi = self.correctedTheta[0]
+        theta = self.correctedTheta[1]
+        phi = self.correctedTheta[2]
+        wX = self.correctedOmega[0]
+        wY = self.correctedOmega[1]
+        wZ = self.correctedOmega[2]
+
+        vB = np.zeros((3,3), dtype=np.float32)
+
+        vB[0][0] = ((cos(psi)*sin(theta)*wY)/cos(theta)) - ((sin(psi)*sin(theta)*wZ)/cos(theta))
+        vB[0][1] = ((sin(psi)*wY)/np.power(cos(theta), 2)) + ((cos(psi)*wZ)/np.power(cos(theta), 2))
+
+        vB[1][0] = -(sin(psi)*wY) - (cos(psi)*wZ)
+
+        vB[2][0] = ((cos(psi)*wY)/cos(theta)) - ((sin(psi)*wZ)/cos(theta))
+        vB[2][1] = ((sin(psi)*sin(theta)*wY)/np.power(cos(theta),2))+((cos(psi)*sin(theta)*wZ)/np.power(cos(theta),2))
+
+        return vB
+
     def computeDThetaDt(self):
         return self.computeWb() @ self.correctedOmega
+    
+    def computeDTheta2Dt2(self):
+        return self.computevB()@self.computeWb()@self.correctedOmega
 
     def computeTheta(self, deltaT):
         dThetaDt = self.computeDThetaDt()
+        dTheta2Dt2 = self.computeDTheta2Dt2()
 
-        self.computedTheta = self.correctedTheta + (dThetaDt*deltaT)
+        self.computedTheta = self.correctedTheta + (dThetaDt*deltaT) #+ (dTheta2Dt2*np.power(deltaT,2)/2)
 
     def correctTheta(self):
         '''!
@@ -66,9 +91,9 @@ class AttitudeComputation():
     def getTheta(self):
         for i in range(3):
             if self.correctedTheta[i] > np.pi:
-                self.correctedTheta[i] = np.pi-0.1
+                self.correctedTheta[i] = np.pi
             elif self.correctedTheta[i] < -np.pi:
-                self.correctedTheta[i] = -np.pi+0.1
+                self.correctedTheta[i] = -np.pi
 
         return self.correctedTheta
 

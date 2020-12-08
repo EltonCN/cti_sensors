@@ -19,6 +19,7 @@ class GyroErrorCompensation():
     def getCorrectedOmega(self):
         if(self.calculate == False):
             self.correctedOmega = self.measuredOmega + self.predictedOmegaError
+            self.predictedOmegaError = np.array([0,0,0], dtype=np.float32)
 
         
 

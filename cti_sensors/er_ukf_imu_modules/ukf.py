@@ -47,14 +47,16 @@ class UKF():
 
         return wb
 
-    def computeVb(self, x):
+    def computeVb(self, thetaVetor, omega):
         #equacao 11, Intertial Head-Tracker Sensor Fusion by a Complementary Separate-Bias Kalman Filter 
-        psi = x[0]
-        theta = x[1]
-        phi = x[2]
-        wX = x[3]
-        wY = x[4]
-        wZ = x[5]
+
+        psi = thetaVetor[0]
+        theta = thetaVetor[1]
+        phi = thetaVetor[2]
+
+        wX = omega[0]
+        wY = omega[1]
+        wZ = omega[2]
 
         vB = np.zeros((3,3), dtype=np.float32)
 
@@ -69,8 +71,8 @@ class UKF():
         return vB
 
     def f(self, x, w2, deltaT):
-        wB = self.computeWb(x)
-        vB = self.computeVb(x)
+        wB = self.computeWb(x[0:3])
+        vB = self.computeVb(x[0:3],x[3:6])
 
 
         theta = x[0:3]
