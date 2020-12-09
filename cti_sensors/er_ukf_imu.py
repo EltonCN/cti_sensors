@@ -33,10 +33,10 @@ class UkfImuNode(Node):
         self.kalmanTime = np.ones(2,dtype=np.float64)*-1
         self.orientationTime = np.ones(2,dtype=np.float64)*-1
 
-        timer_period = 0.016
+        timer_period = 1e-3#0.016
         self.kalmanTimer = self.create_timer(timer_period, self.kalmanCallback)
 
-        timer_period = 0.016
+        timer_period = 1e-3#0.016
         self.orientationTimer = self.create_timer(timer_period, self.orientationCallback)
 
         self.debugTimer = self.create_timer(timer_period, self.debugCallback)
@@ -232,9 +232,9 @@ def main(args=None):
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(node)
 
-    executor.spin()
+    #executor.spin()
 
-    #rclpy.spin(node)
+    rclpy.spin(node)
 
     node.destroy_node()
     executor.shutdown()

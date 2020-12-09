@@ -15,9 +15,10 @@ class MeasurementHandler():
         self.magneticIntensity = magneticIntensity
         self.inclination = np.radians(inclination)
 
-        ''' Oxford
+        #Oxford
+
         self.magneticIntensity = 48956.6e-9
-        self.inclination = np.radians(66.6442)'''
+        self.inclination = np.radians(66.6442)
 
         self.gravity = gravity
 

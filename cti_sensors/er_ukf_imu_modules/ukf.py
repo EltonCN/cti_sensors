@@ -17,10 +17,10 @@ class UKF():
         self.measurement = np.zeros(3,dtype=np.float64)
 
         self.estimateState = np.zeros(6, dtype=np.float64)
-        self.stateCovariance = np.eye(6,dtype=np.float64) *1
+        self.stateCovariance = np.eye(6,dtype=np.float64) *0.01
 
-        self.processNoise = np.eye(6,dtype=np.float64)*(72e-3) #Q
-        self.measurementNoise = np.eye(3,dtype=np.float64)*(72e-3) #R
+        self.processNoise = np.eye(6,dtype=np.float64)*(72e-1) #Q
+        self.measurementNoise = np.eye(3,dtype=np.float64)*(72e-1) #R
 
         self.N = 6.0
         self.k = 3.0-self.N
