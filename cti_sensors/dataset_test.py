@@ -202,10 +202,10 @@ class DatasetTest(Node):
             self.resultFrame['truth.x'][i] = -euler[0]
             self.resultFrame['truth.y'][i] = -euler[1]
 
-            euler[2] += 90
+            euler[2] -= 90
 
-            if euler[2] > 180:
-                euler[2] -= 180
+            if euler[2] < 180:
+                euler[2] += 180
 
             self.resultFrame['truth.z'][i] = euler[2]
 

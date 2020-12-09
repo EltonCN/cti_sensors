@@ -17,7 +17,7 @@ class UKF():
         self.measurement = np.zeros(3,dtype=np.float64)
 
         self.estimateState = np.zeros(6, dtype=np.float64)
-        self.stateCovariance = np.eye(6,dtype=np.float64) *0.01
+        self.stateCovariance = np.eye(6,dtype=np.float64) *1
 
         self.processNoise = np.eye(6,dtype=np.float64)*(72e-1) #Q
         self.measurementNoise = np.eye(3,dtype=np.float64)*(72e-1) #R
@@ -79,13 +79,56 @@ class UKF():
         w = x[3:6]
 
         theta2 = theta
-        theta2 += ((w+w2)/2)*deltaT
+        theta2 += wB@((w+w2)/2)*deltaT
 
         theta2 += ((vB@wB)@w)*np.power(deltaT,2)
 
         x2 = np.hstack((theta2, w2))
-        
+
         return x2
+
+        '''A = np.zeros((6,6),dtype=np.float64)
+
+        phi = self.estimateTheta[0]
+        theta = self.estimateTheta[1]
+        psi = self.estimateTheta[2]
+        wX = self.estimateOmega[0]
+        wY = self.estimateOmega[1]
+        wZ = self.estimateOmega[2]
+
+        A[0][0] = tan(theta)*((cos(phi)*wY)-(sin(phi)*wZ))
+        A[0][1] = (1+np.power(tan(theta),2))*((sin(phi)*wY)+(cos(phi)*wZ))
+        A[0][3] = 1
+        A[0][4] = sin(phi)*tan(theta)
+        A[0][5] = cos(phi)*tan(theta)
+
+        A[1][0] = -((sin(phi)*wY)+(cos(phi)*wZ))
+        A[1][4] = cos(phi)
+        A[1][5] = -sin(phi)
+
+        A[2][0] = (1/cos(theta))*((cos(phi)*wY)-(sin(phi)*wZ))
+        A[2][1] = (sin(theta)/np.power(cos(theta),2))*((sin(phi)*wY)+(cos(phi)*wZ))
+        A[2][4] = sin(phi) / cos(theta)
+        A[2][5] = cos(phi)/cos(theta)
+
+        deltaX = A@x
+
+        return x + (deltaX*deltaT)'''
+
+    def computeNoise(self):
+        wMax = np.max(self.estimateOmega)
+
+        sigmaW2 = (10**-8)*(1+np.power(wMax,2)+((10**-4)*np.power(wMax,6)))
+
+        QTil = np.eye(3,dtype=np.float64)*sigmaW2
+
+        wB = self.computeWb(self.estimateTheta)
+
+        self.processNoise[3:,3:] = wB@QTil@wB.T
+
+        sigmaV = 5
+
+        self.measurementNoise = np.eye(3,dtype=np.float64)*np.power(sigmaV,2)
 
     def setEstimateTheta(self, theta):
         self.estimateTheta = theta
@@ -124,6 +167,8 @@ class UKF():
     def compute(self, deltaT):
         previousState = self.estimateState
         previousCovariance = self.stateCovariance
+
+        #self.computeNoise()
 
         ##Predicao##
 
