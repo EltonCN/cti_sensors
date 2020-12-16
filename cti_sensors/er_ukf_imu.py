@@ -11,7 +11,7 @@ from geometry_msgs.msg import Vector3, PoseStamped, Quaternion
 from .er_ukf_imu_modules.attitude_computation import AttitudeComputation
 from .er_ukf_imu_modules.error_compensation import GyroErrorCompensation
 from .er_ukf_imu_modules.measurement_handler import MeasurementHandler
-from .er_ukf_imu_modules.ukf import UKF
+from .er_ukf_imu_modules.er_ukf_imu import ErUkfImu
 
 class UkfImuNode(Node):
     def __init__(self, gravity=9.78613):
@@ -28,7 +28,7 @@ class UkfImuNode(Node):
         self.attitudeComputation = AttitudeComputation()
         self.gyroErrorCompensation = GyroErrorCompensation()
         self.measurementHandler = MeasurementHandler()
-        self.ukf = UKF()
+        self.ukf = ErUkfImu()
 
         self.kalmanTime = np.ones(2,dtype=np.float64)*-1
         self.orientationTime = np.ones(2,dtype=np.float64)*-1
@@ -98,7 +98,7 @@ class UkfImuNode(Node):
         if self.kalmanTime[0] == -1:
             return
 
-        self.ukf.setMeasurement(self.measurementHandler.getMeasurement())
+        self.ukf.setMeasurement(self.measurementHandler.getErrorMeasurement())
         self.ukf.setEstimateOmega(self.gyroErrorCompensation.getCorrectedOmega())
         self.ukf.setEstimateTheta(self.attitudeComputation.getTheta())
 
@@ -115,7 +115,7 @@ class UkfImuNode(Node):
         
         except Exception as e:
             self._logger.error("Filtro gerou excecao: "+str(e)+". Reiniciando filtro")
-            self.ukf = UKF()
+            self.ukf = ErUkfImu()
 
     def orientationCallback(self):
 
@@ -173,10 +173,10 @@ class UkfImuNode(Node):
 
         orientation = Quaternion()
 
-        orientation.x = quat[0]*1
-        orientation.y = quat[1]*1
-        orientation.z = quat[2]*1
-        orientation.w = quat[3]*1
+        orientation.x = quat[0]*1.0
+        orientation.y = quat[1]*1.0
+        orientation.z = quat[2]*1.0
+        orientation.w = quat[3]*1.0
 
         return orientation
 

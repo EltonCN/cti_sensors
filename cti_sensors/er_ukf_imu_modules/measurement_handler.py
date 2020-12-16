@@ -1,5 +1,6 @@
 import numpy as np
-from numpy import arctan2, arcsin, cos, sin
+from numpy import arctan2, arccos, arcsin, cos, sin
+from scipy.spatial.transform import Rotation
 
 class MeasurementHandler():
     def __init__(self, magneticIntensity=22902.5e-9, inclination=-39.2538, gravity=9.78613):
@@ -17,10 +18,12 @@ class MeasurementHandler():
 
         #Oxford
 
-        self.magneticIntensity = 48956.6e-9
-        self.inclination = np.radians(66.6442)
+        #self.magneticIntensity = 48956.6e-9
+        #self.inclination = np.radians(66.6442)
 
         self.gravity = gravity
+
+        self.r = np.array([0,0,0,1])
 
     def setMagneticIntensity(self, magneticIntensity):
         self.magneticIntensity = magneticIntensity
@@ -39,46 +42,29 @@ class MeasurementHandler():
     def setAccelRead(self, accel):
         self.accel = accel
 
+        self.accel /= np.linalg.norm(self.accel)
+        
+
         self.calculated = False
     
     def setMagRead(self, mag):
         self.mag = mag
 
+        self.mag /= np.linalg.norm(self.mag)
+
         self.calculated = False
 
     def computeReference(self):
 
-        #phi = 0, theta = 1, psi = 2
-        phi = arctan2(self.accel[1], self.accel[2])
+        B = np.array([sin(self.inclination), 0, cos(self.inclination)], dtype=np.float64)
+        A = np.array([0,0,1],dtype=np.float64)
 
-        if self.accel[0] >= self.gravity:
-            self.accel[0] = self.gravity
-        elif self.accel[0] <= -self.gravity:
-            self.accel[0] = -self.gravity
+        
 
-        thetaArc = -self.accel[0]/self.gravity
+        r, f = Rotation.align_vectors(np.array([A,B]),np.array([self.accel, self.mag]))
 
-        if(thetaArc <= -1):
-            thetaArc = -1
-        elif(thetaArc >= 1):
-            thetaArc = 1
-
-        theta = arcsin(thetaArc)
-
-        a = cos(theta)*((self.mag[2]*sin(phi))-(self.mag[1]*cos(phi)))
-        b = self.mag[0] + (self.magneticIntensity*sin(self.inclination)*sin(theta))
-
-        psi = arctan2(a, b)
-
-        self.referenceOrientation[0] = phi
-        self.referenceOrientation[1] = theta
-        self.referenceOrientation[2] = psi
-
-        for i in range(3):
-            if self.referenceOrientation[i] > np.pi:
-                self.referenceOrientation[i] = np.pi
-            elif self.referenceOrientation[i] < -np.pi:
-                self.referenceOrientation[i] = -np.pi
+        self.referenceOrientation = r.as_euler("xyz")
+        self.r = r.as_quat()
 
 
 
@@ -95,11 +81,13 @@ class MeasurementHandler():
 
         self.calculated = True
 
-    def getMeasurement(self):
+    def getErrorMeasurement(self):
         if self.calculated == False:
             self.compute()
 
         return self.measurement
-    
+
+    def getReference(self):
+        return self.referenceOrientation    
 
 
