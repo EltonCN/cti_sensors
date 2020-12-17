@@ -7,12 +7,16 @@ from scipy.spatial.transform import Rotation
 
 from sensor_msgs.msg import Imu, MagneticField
 from geometry_msgs.msg import PoseStamped, Vector3
+from rcl_interfaces.srv import SetParameters
+from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
+
+
 
 class DatasetTest(Node):
     def __init__(self):
         super().__init__("dataset_test")
 
-        dataDirectory = "E:\\Datasets\\Oxford Inertial Odometry\\Oxford Inertial Odometry Dataset_2.0\\Oxford Inertial Odometry Dataset\\handheld\\data1\\raw"
+        dataDirectory = "E:\\Datasets\\Oxford Inertial Odometry\\Oxford Inertial Odometry Dataset_2.0\\Oxford Inertial Odometry Dataset\\handheld\\data2\\raw"
 
         self.sensorFrame = pd.read_csv(dataDirectory+"\\imu1.csv")
         self.truthFrame = pd.read_csv(dataDirectory+"\\vi1.csv")
@@ -36,7 +40,10 @@ class DatasetTest(Node):
         self.sensorTime = self.sensorFrame["time"][0]
         self.sensorIndex = 0
 
-        self.dataPercent = 0.05
+        self.dataPercent = 1
+
+        self.sendParameter()
+
 
         self.estimationSub = self.create_subscription(PoseStamped, '/ukf_imu/estimate_pose', self.estimationCallback, 10)
         self.referenceSub = self.create_subscription(PoseStamped, '/ukf_imu/reference_pose', self.referenceCallback, 10)
@@ -49,6 +56,39 @@ class DatasetTest(Node):
 
         self.publishTimer = self.create_timer(self.timer_period, self.publishCallback)
         self.infoTimer = self.create_timer(self.info_period, self.infoCallback)
+
+    def sendParameter(self):
+
+        #Oxford
+        #self.magneticIntensity = 48956.6e-9
+        #self.inclination = np.radians(66.6442)
+
+        self.paramClient = self.create_client(SetParameters, "/ukf_imu/set_parameters")
+        while not self.paramClient.wait_for_service(timeout_sec=1.0):
+            pass
+        
+        req = SetParameters.Request()
+
+        magValue = ParameterValue()
+        magValue.type = ParameterType.PARAMETER_DOUBLE
+        magValue.double_value = 48956.6e-9
+
+        magParam = Parameter()
+        magParam.name = "magneticIntensity"
+        magParam.value = magValue
+
+        incValue = ParameterValue()
+        incValue.type = ParameterType.PARAMETER_DOUBLE
+        incValue.double_value = 66.6442
+
+        incParam = Parameter()
+        incParam.name = "inclination"
+        incParam.value = incValue
+
+        req.parameters = [magParam, incParam]
+        
+        self.future = self.paramClient.call_async(req)
+        
 
     def infoCallback(self):
         if self.sensorIndex <= len(self.sensorFrame)*self.dataPercent:
@@ -67,15 +107,15 @@ class DatasetTest(Node):
 
         covariance = np.zeros((3,3), dtype=np.float64)
 
-        accel = -self.sensorFrame["gravity_x"][self.sensorIndex]+self.sensorFrame["user_acc_x"][self.sensorIndex]
+        accel = -self.sensorFrame["gravity_x"][self.sensorIndex]#+self.sensorFrame["user_acc_x"][self.sensorIndex]
         accel *= 9.80665
         msg.linear_acceleration.x = accel
         
-        accel = -self.sensorFrame["gravity_y"][self.sensorIndex]+self.sensorFrame["user_acc_y"][self.sensorIndex]
+        accel = -self.sensorFrame["gravity_y"][self.sensorIndex]#+self.sensorFrame["user_acc_y"][self.sensorIndex]
         accel *= 9.80665
         msg.linear_acceleration.y = accel
 
-        accel = -self.sensorFrame["gravity_z"][self.sensorIndex]+self.sensorFrame["user_acc_z"][self.sensorIndex]
+        accel = -self.sensorFrame["gravity_z"][self.sensorIndex]#+self.sensorFrame["user_acc_z"][self.sensorIndex]
         accel *= 9.80665
         msg.linear_acceleration.z = accel
 
@@ -98,6 +138,7 @@ class DatasetTest(Node):
         timeSec = float(self.sensorTime)
         msg.header.stamp.sec = int(timeSec)
         msg.header.stamp.nanosec = int((timeSec*1000000000)%1000000000)
+        msg.header.frame_id = "dataset"
 
         self.imuPublish.publish(msg)
 
@@ -111,6 +152,8 @@ class DatasetTest(Node):
 
         msg.header.stamp.sec = int(timeSec)
         msg.header.stamp.nanosec = int((timeSec*1000000000)%1000000000)
+
+        msg.header.frame_id = "dataset"
 
         self.magPublish.publish(msg)
 
@@ -199,15 +242,12 @@ class DatasetTest(Node):
             r = Rotation.from_quat(quat)
             euler = r.as_euler("xyz",degrees=True)
 
-            self.resultFrame['truth.x'][i] = -euler[0]
-            self.resultFrame['truth.y'][i] = -euler[1]
-
-            euler[2] -= 90
-
-            if euler[2] < 180:
-                euler[2] += 180
-
+            self.resultFrame['truth.x'][i] = euler[0]
+            self.resultFrame['truth.y'][i] = euler[1]
             self.resultFrame['truth.z'][i] = euler[2]
+            
+
+            
 
     def save(self):
         self.resultFrame.to_csv(r'result.csv')

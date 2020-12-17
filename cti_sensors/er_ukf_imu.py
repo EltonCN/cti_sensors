@@ -7,6 +7,7 @@ from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import Imu, MagneticField
 from std_msgs.msg import Header
 from geometry_msgs.msg import Vector3, PoseStamped, Quaternion
+from rcl_interfaces.msg import SetParametersResult
 
 from .er_ukf_imu_modules.attitude_computation import AttitudeComputation
 from .er_ukf_imu_modules.error_compensation import GyroErrorCompensation
@@ -21,13 +22,22 @@ class UkfImuNode(Node):
         self.magSub = self.create_subscription(MagneticField, 'mag', self.magCallback, 10)
         self.publisher = self.create_publisher(Imu, "ukf_estimation", 10)
 
+        self.declare_parameter("gravity",9.78613)
+        self.declare_parameter("magneticIntensity",22902.5e-9)
+        self.declare_parameter("inclination",-39.2538)
+        self.add_on_set_parameters_callback(self.parameterCallback)
+
         self.accel = np.array([0.0,0.0,0.0], dtype=np.float64)
         self.gravity = gravity
         self.header = Header()
 
+        gravity = self.get_parameter("gravity").get_parameter_value().double_value
+        magneticIntensity = self.get_parameter("magneticIntensity").get_parameter_value().double_value
+        inclination = self.get_parameter("inclination").get_parameter_value().double_value
+
         self.attitudeComputation = AttitudeComputation()
         self.gyroErrorCompensation = GyroErrorCompensation()
-        self.measurementHandler = MeasurementHandler()
+        self.measurementHandler = MeasurementHandler(magneticIntensity, inclination, gravity)
         self.ukf = ErUkfImu()
 
         self.kalmanTime = np.ones(2,dtype=np.float64)*-1
@@ -47,6 +57,18 @@ class UkfImuNode(Node):
         self.debugPublisher.append(self.create_publisher(PoseStamped, '~/without_correction', 10))
         self.debugPublisher.append(self.create_publisher(Vector3, '~/estimate', 10))
         self.debugPublisher.append(self.create_publisher(Vector3, '~/reference', 10))
+
+    def parameterCallback(self, params):
+        for param in params:
+            if param.name == "gravity":
+                self.measurementHandler.setGravity(param.value)
+            elif param.name == "magneticIntensity":
+                self.measurementHandler.setMagneticIntensity(param.value)
+            elif param.name == "inclination":
+                self.measurementHandler.setInclination(param.value)
+
+        return SetParametersResult(successful=True)
+        
 
     def publishDebug(self, vec, channel=1):
         msg = Vector3()
@@ -211,16 +233,16 @@ class UkfImuNode(Node):
         msg = Vector3()
         degree = np.degrees(self.attitudeComputation.getTheta())
         msg.x = degree[0]
-        msg.x = degree[1]
-        msg.x = degree[2]
+        msg.y = degree[1]
+        msg.z = degree[2]
 
         self.debugPublisher[3].publish(msg)
 
         msg = Vector3()
         degree = np.degrees(self.measurementHandler.referenceOrientation)
         msg.x = degree[0]
-        msg.x = degree[1]
-        msg.x = degree[2]
+        msg.y = degree[1]
+        msg.z = degree[2]
 
         self.debugPublisher[3].publish(msg)
 

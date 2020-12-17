@@ -91,9 +91,9 @@ class AttitudeComputation():
     def getTheta(self):
         for i in range(3):
             if self.correctedTheta[i] > np.pi:
-                self.correctedTheta[i] = np.pi
+                self.correctedTheta[i] -= 2*np.pi
             elif self.correctedTheta[i] < -np.pi:
-                self.correctedTheta[i] = -np.pi
+                self.correctedTheta[i] += 2*np.pi
 
         return self.correctedTheta
 
