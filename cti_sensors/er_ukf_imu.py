@@ -24,7 +24,7 @@ class UkfImuNode(Node):
 
         self.declare_parameter("gravity",9.78613)
         self.declare_parameter("magneticIntensity",22902.5e-9)
-        self.declare_parameter("inclination",-39.2538)
+        self.declare_parameter("inclination",-39.2722)
         self.add_on_set_parameters_callback(self.parameterCallback)
 
         self.accel = np.array([0.0,0.0,0.0], dtype=np.float64)
@@ -94,7 +94,7 @@ class UkfImuNode(Node):
         gyro[2] = msg.angular_velocity.z
 
         self.gyroErrorCompensation.setMeasuredOmega(gyro)
-        self.measurementHandler.setAccelRead(self.accel)
+        self.measurementHandler.setAccelRead(np.copy(self.accel))
 
 
         time = float(msg.header.stamp.sec)+(float(msg.header.stamp.nanosec)*(10**-9))
@@ -171,11 +171,16 @@ class UkfImuNode(Node):
         msg.angular_velocity.y = omega[1]*1
         msg.angular_velocity.z = omega[2]*1
 
-        gravityRotated = np.array([-self.gravity*np.sin(theta[1]), 
-                                    self.gravity*np.cos(theta[1])*np.sin(theta[0]),
-                                    self.gravity*np.cos(theta[1])*np.sin(theta[0]) ],
-                                    dtype=np.float64)
-        pureAcceleration = self.accel - gravityRotated
+
+        msg.orientation = self.thetaToOrientation(theta)
+
+        grav = np.array([0,0,self.gravity], dtype=np.float64)
+        
+        r = self.thetaToRotation(theta)
+
+        grav = r.apply(grav, True)
+
+        pureAcceleration = self.accel - grav
         msg.linear_acceleration.x = pureAcceleration[0]*1
         msg.linear_acceleration.y = pureAcceleration[1]*1
         msg.linear_acceleration.z = pureAcceleration[2]*1
@@ -185,12 +190,12 @@ class UkfImuNode(Node):
         msg.orientation_covariance = cov
         msg.linear_acceleration_covariance = cov
 
-        msg.orientation = self.thetaToOrientation(theta)
+        
 
         self.publisher.publish(msg)
 
     def thetaToOrientation(self, theta):
-        r = Rotation.from_euler('xyz',theta)
+        r = self.thetaToRotation(theta)
         quat = r.as_quat()
 
         orientation = Quaternion()
@@ -201,6 +206,9 @@ class UkfImuNode(Node):
         orientation.w = quat[3]*1.0
 
         return orientation
+
+    def thetaToRotation(self, theta):
+        return Rotation.from_euler('xyz',theta)
 
     def debugCallback(self):
         msg = PoseStamped()
